@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * { margin: 0; padding: 0; }
+        body { background: #333; overflow: hidden; position: fixed; font-family: 'Arial', sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; pointer-events: none; }
+        #lvl-text { font-size: 24px; color: #f1c40f; font-weight: bold; }
+        #score-text { font-size: 20px; }
+        #controls { position: absolute; bottom: 30px; left: 30px; display: grid; grid-template-columns: repeat(3, 85px); gap: 12px; }
+        .btn { width: 85px; height: 85px; background: rgba(255,255,255,0.9); border: 3px solid #000; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 35px; touch-action: none; }
+        #up { grid-column: 2; } #left { grid-column: 1; grid-row: 2; } #down { grid-column: 2; grid-row: 2; } #right { grid-column: 3; grid-row: 2; }
+        #msg { display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.8); flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 100; }
+        button { margin-top: 20px; padding: 15px 40px; font-size: 22px; background: #27ae60; color: white; border: none; border-radius: 12px; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div id="lvl-text">LIVELLO 1</div>
+        <div id="score-text">Pesci: 0 / 5</div>
+    </div>
+    <canvas id="g"></canvas>
+    <div id="controls">
+        <div id="up" class="btn">▲</div><div id="left" class="btn">◀</div><div id="down" class="btn">▼</div><div id="right" class="btn">▶</div>
+    </div>
+    <div id="msg"><h1 id="msg-title">GAME OVER</h1><button id="retry-btn">RIGIOCA</button></div>
+
+<script>
+    const c = document.getElementById("g"), x = c.getContext("2d");
+    const res = () => { c.width = window.innerWidth; c.height = window.innerHeight; };
+    window.onresize = res; res();
+
+    let cat, dog, fishes = [], keys = {}, level = 1, caught = 0, live = true;
+    const wallColors = ["#922", "#229", "#292", "#929", "#444"];
+
+    function drawCat(p) {
+        x.save(); x.translate(p.x, p.y);
+        x.fillStyle="#e67e22"; x.strokeStyle="#000"; x.lineWidth=2;
+        x.beginPath(); x.ellipse(0, 0, 24, 16, 0, 0, 7); x.fill(); x.stroke(); // Corpo
+        x.beginPath(); x.arc(18, -10, 12, 0, 7); x.fill(); x.stroke(); // Testa
+        x.beginPath(); x.moveTo(12,-18); x.lineTo(8,-28); x.lineTo(16,-20); x.fill(); x.stroke(); // Orecchie
+        x.beginPath(); x.moveTo(22,-18); x.lineTo(26,-28); x.lineTo(26,-20); x.fill(); x.stroke();
+        x.beginPath(); x.moveTo(-15,0); x.quadraticCurveTo(-35,-20,-28,12); x.stroke(); // Coda
+        x.restore();
+    }
+
+    function drawDog(p) {
+        x.save(); x.translate(p.x, p.y);
+        x.fillStyle="#5d4037"; x.strokeStyle="#000"; x.lineWidth=2;
+        x.beginPath(); x.ellipse(0, 0, 42, 30, 0, 0, 7); x.fill(); x.stroke(); // Corpo
+        x.beginPath(); x.arc(35, 2, 24, 0, 7); x.fill(); x.stroke(); // Testa
+        x.fillStyle="#3e2723"; x.beginPath(); x.moveTo(25,-10); x.bezierCurveTo(15,-5,15,25,25,20); x.fill(); x.stroke(); // Orecchie
+        x.beginPath(); x.moveTo(45,-10); x.bezierCurveTo(55,-5,55,25,45,20); x.fill(); x.stroke();
+        x.restore();
+    }
+
+    function spawn() { fishes.push({x: 80+Math.random()*(c.width-160), y: 150+Math.random()*(c.height-220)}); }
+
+    function init() {
+        cat = {x: 100, y: 250, v: 8};
+        dog = {x: c.width-100, y: c.height-100, v: 3 + (level * 0.5)};
+        fishes = []; caught = 0; live = true;
+        for(let i=0; i<3; i++) spawn();
+        document.getElementById("msg").style.display = "none";
+        document.getElementById("lvl-text").innerText = "LIVELLO " + level;
+        document.getElementById("score-text").innerText = "Pesci: 0 / 5";
+    }
+
+    ["up","down","left","right"].forEach(id => {
+        const b = document.getElementById(id);
+        b.ontouchstart = (e) => { e.preventDefault(); keys[id] = true; };
+        b.ontouchend = (e) => { e.preventDefault(); keys[id] = false; };
+    });
+
+    document.getElementById("retry-btn").ontouchstart = () => { if(live==false) { if(caught>=5) level++; else level=1; init(); loop(); } };
+
+    function loop() {
+        if(!live) return;
+        if(keys.up && cat.y > 120) cat.y -= cat.v;
+        if(keys.down && cat.y < c.height-40) cat.y += cat.v;
+        if(keys.left && cat.x > 40) cat.x -= cat.v;
+        if(keys.right && cat.x < c.width-40) cat.x += cat.v;
+
+        let dx=cat.x-dog.x, dy=cat.y-dog.y, d=Math.sqrt(dx*dx+dy*dy);
+        dog.x += (dx/d)*dog.v; dog.y += (dy/d)*dog.v;
+
+        x.fillStyle="#555"; x.fillRect(0,0,c.width,c.height); // Strada
+        x.fillStyle=wallColors[(level-1)%5]; x.fillRect(0,0,c.width,100); // Muro cambia colore
+        x.strokeStyle="#fff"; x.strokeRect(0,0,c.width,100);
+
+        fishes.forEach((f, i) => {
+            x.fillStyle="cyan"; x.beginPath(); x.ellipse(f.x, f.y, 14, 8, 0.5, 0, 7); x.fill();
+            if(Math.sqrt((cat.x-f.x)**2+(cat.y-f.y)**2)<45){ 
+                fishes.splice(i,1); caught++; spawn(); 
+                document.getElementById("score-text").innerText = "Pesci: " + caught + " / 5";
+                if(caught >= 5) {
+                    live = false;
+                    document.getElementById("msg-title").innerText = "LIVELLO SUPERATO!";
+                    document.getElementById("msg").style.display = "flex";
+                }
+            }
+        });
+
+        drawDog(dog); drawCat(cat);
+
+        if(d < 60) {
+            live = false;
+            document.getElementById("msg-title").innerText = "IL CANE TI HA PRESO!";
+            document.getElementById("msg").style.display = "flex";
+            level = 1; // Torna al livello 1 se perdi
+        }
+
+        if(live) requestAnimationFrame(loop);
+    }
+
+    init(); loop();
+</script>
+</body>
+</html>
